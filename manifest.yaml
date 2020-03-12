@@ -9,15 +9,7 @@ include:
   - fedora-coreos-config/manifests/file-transfer.yaml
   # RHCOS owned packages
   - rhcos-packages.yaml
-
-repos:
-  # Base RHEL
-  - rhel8-baseos
-  - rhel8-appstream
-  - rhel8-fast-datapath
-  # ART puddle repos
-  - art-rhcos-4.4
-  - art-rhcos-4.5
+  - centos-stream-repos.yaml
 
 # We include hours/minutes to avoid version number reuse
 automatic-version-prefix: "45.81.<date:%Y%m%d%H%M>"

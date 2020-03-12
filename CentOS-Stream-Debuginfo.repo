@@ -1,0 +1,21 @@
+# CentOS-Debug.repo
+#
+# The mirror system uses the connecting IP address of the client and the
+# update status of each mirror to pick mirrors that are updated to and
+# geographically close to the client.  You should use this for CentOS updates
+# unless you are manually picking other mirrors.
+#
+
+# All debug packages from all the various CentOS-8 releases
+# are merged into a single repo, split by BaseArch
+#
+# Note: packages in the debuginfo repo are currently not signed
+#
+
+[Stream-base-debuginfo]
+name=CentOS-Stream - Debuginfo
+baseurl=http://debuginfo.centos.org/8-stream/$basearch/
+gpgcheck=1
+enabled=0
+gpgkey=file:///usr/share/distribution-gpg-keys/centos/RPM-GPG-KEY-CentOS-Official
+
