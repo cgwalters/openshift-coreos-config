@@ -1,0 +1,13 @@
+# See https://github.com/coreos/coreos-assembler/pull/298
+size: 16
+# See https://github.com/coreos/coreos-assembler/pull/551
+save-var-subdirs-for-selabel-workaround: "yes"
+
+# Enable LUKS root volume
+# Disabled due to https://gitlab.cee.redhat.com/coreos/redhat-coreos/merge_requests/632
+luks_rootfs: "yes"
+# This pairs with the above so we can easily detect in the initrd
+extra-kargs:
+  - rhcos.root=crypt_rootfs
+# https://bugzilla.redhat.com/show_bug.cgi?id=1812276
+squashfs-compression: gzip

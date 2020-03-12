@@ -1,0 +1,11 @@
+# Regenerate /etc/iscsi/initiatorname.iscsi at first boot
+[Unit]
+Documentation=https://bugzilla.redhat.com/show_bug.cgi?id=1687722
+ConditionFirstBoot=true
+Before=iscsid.service
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/sh -c 'echo "InitiatorName=`/usr/sbin/iscsi-iname`" > /etc/iscsi/initiatorname.iscsi'
+RemainAfterExit=yes
+[Install]
+WantedBy=multi-user.target

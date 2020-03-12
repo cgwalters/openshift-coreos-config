@@ -1,0 +1,255 @@
+rojig:
+  license: MIT
+  name: rhcos
+  summary: OpenShift 4
+
+# We inherit from Fedora CoreOS' base configuration
+include:
+  - fedora-coreos-config/manifests/ignition-and-ostree.yaml
+  - fedora-coreos-config/manifests/file-transfer.yaml
+  # RHCOS owned packages
+  - rhcos-packages.yaml
+
+repos:
+  # Base RHEL
+  - rhel8-baseos
+  - rhel8-appstream
+  - rhel8-fast-datapath
+  # ART puddle repos
+  - art-rhcos-4.4
+  - art-rhcos-4.5
+
+# We include hours/minutes to avoid version number reuse
+automatic-version-prefix: "45.81.<date:%Y%m%d%H%M>"
+# This ensures we're semver-compatible which OpenShift wants
+automatic-version-suffix: "-"
+mutate-os-release: "4.5"
+
+documentation: false
+initramfs-args:
+  - "--no-hostonly"
+  - "--add-drivers"
+  - "mptspi vmw_pvscsi"
+  - "--omit-drivers"
+  - "nouveau"
+  - "--omit"
+  # we don't need root-on-NFS
+  # see upstream: https://github.com/coreos/fedora-coreos-config/pull/60
+  - "nfs"
+  - "--add"
+  - "iscsi"
+  - "ignition"
+  - "--add"
+  - "ifcfg"
+  - "--add"
+  - "fips"
+
+postprocess:
+  - |
+     #!/usr/bin/env bash
+     set -xeo pipefail
+
+     # Disable PasswordAuthentication in SSH
+     sed -i "s|^PasswordAuthentication yes$|PasswordAuthentication no|g" /etc/ssh/sshd_config
+     # Disable root login because don't do that.
+     sed -i "s|^PermitRootLogin yes$|PermitRootLogin no|g" /etc/ssh/sshd_config
+     # Enable ClientAliveInterval and set to 180 per https://bugzilla.redhat.com/show_bug.cgi?id=1701050
+     sed -i "s|^#ClientAliveInterval 0$|ClientAliveInterval 180|g" /etc/ssh/sshd_config
+
+     # TEMPORARY: Create /etc/vmware-tools/tools.conf to ensure RHCOS shows up properly in VMWare
+     # See https://jira.coreos.com/browse/RHCOS-258
+     if [ "$(uname -m)" == "x86_64" ]; then
+     cat > /etc/vmware-tools/tools.conf <<'EOF'
+     [guestosinfo]
+     short-name = rhel8-64
+     EOF
+     fi
+
+     # Persistent journal by default; we don't have syslog by default,
+     # and further the systemd default of "persistent only if /var/log/journal"
+     # conflicts with the "/var starts empty" OSTree model.
+     echo 'Storage=persistent' >> /etc/systemd/journald.conf
+
+     # Nuke network.service from orbit
+     # https://github.com/openshift/os/issues/117
+     rm -rf /etc/rc.d/init.d/network /etc/rc.d/rc*.d/*network
+
+     # We're not using resolved yet
+     rm -f /usr/lib/systemd/system/systemd-resolved.service
+
+     # Let's have a non-boring motd, just like CL (although theirs is more subdued
+     # nowadays compared to early versions with ASCII art).  One thing we do here
+     # is add --- as a "separator"; the idea is that any "dynamic" information should
+     # be below that.
+     # See: https://projects.engineering.redhat.com/browse/COREOS-1029
+     . /etc/os-release
+     cat > /etc/motd <<EOF
+     Red Hat Enterprise Linux CoreOS $VERSION
+       Part of OpenShift ${OPENSHIFT_VERSION}, RHCOS is a Kubernetes native operating system
+       managed by the Machine Config Operator (\`clusteroperator/machine-config\`).
+
+     WARNING: Direct SSH access to machines is not recommended; instead,
+     make configuration changes via \`machineconfig\` objects:
+       https://docs.openshift.com/container-platform/${OPENSHIFT_VERSION}/architecture/architecture-rhcos.html
+
+     ---
+     EOF
+  - |
+    #!/usr/bin/env bash
+    set -xeuo pipefail
+    # manually modify SELinux booleans that are needed for OCP use cases
+    semanage boolean --modify --on container_use_cephfs      # RHBZ#1694045
+    semanage boolean --modify --on virt_use_samba            # RHBZ#1754825
+
+  # https://bugzilla.redhat.com/show_bug.cgi?id=1762509
+  - |
+    #!/usr/bin/env bash
+    sed -i -e 's,echo "rd.neednet=1",true,' /usr/lib/dracut/modules.d/60clevis/module-setup.sh
+
+  # https://gitlab.cee.redhat.com/coreos/redhat-coreos/merge_requests/812
+  # https://bugzilla.redhat.com/show_bug.cgi?id=1796537
+  - |
+    #!/usr/bin/bash
+    mkdir -p /usr/share/containers/oci/hooks.d
+
+  # Undo RPM scripts enabling units; we want the presets to be canonical
+  # See https://github.com/coreos/fedora-coreos-config/pull/77
+  # and https://github.com/coreos/fedora-coreos-config/commit/b7831399c6b2390cf5162b9486bdefc2a3bd5d9c
+  # If you change this, please change FCOS first.
+  - |
+    #!/usr/bin/env bash
+    set -xeuo pipefail
+    rm -rf /etc/systemd/system/*
+    systemctl preset-all
+
+  # This updates the PAM configuration to reference all of the SSSD modules.
+  # Removes the `authselect` binary afterwards since `authselect` does not play well with `nss-altfiles`
+  # (https://github.com/pbrezina/authselect/issues/48).
+  # https://bugzilla.redhat.com/show_bug.cgi?id=1774154
+  # NOTE: This is a temporary hack which should be updated after switching to systemd-sysusers
+  - |
+    #!/usr/bin/env bash
+    set -xeuo pipefail
+    # use `authselect test` since `authselect select` wants to copy to `/var` too
+    authselect test sssd --nsswitch | tail -n +2 > /etc/nsswitch.conf
+    for pam_file in system-auth password-auth smartcard-auth fingerprint-auth postlogin; do
+      authselect test sssd --${pam_file} | tail -n +2 > /etc/pam.d/${pam_file}
+    done
+    rm -f $(which authselect)
+
+etc-group-members:
+  - wheel
+  - sudo
+  - systemd-journal
+  - adm
+ignore-removed-users:
+  - root
+ignore-removed-groups:
+  - root
+check-passwd:
+  type: "file"
+  filename: "passwd"
+check-groups:
+  type: "file"
+  filename: "group"
+
+exclude-packages:
+  # https://bugzilla.redhat.com/show_bug.cgi?id=1798278
+  - subscription-manager
+  # And this one shouldn't come in
+  - dnf
+
+# Try to maintain this list ordering by "in RHEL, then not in RHEL".
+# To verify, disable all repos except the ootpa ones and then comment
+# out the bottom and run `coreos-assembler build`.
+packages:
+ # Dependency of iscsi
+ - hostname
+ # For growing root partition
+ - cloud-utils-growpart
+ # Contains SCTP (https://bugzilla.redhat.com/show_bug.cgi?id=1718049)
+ # and it's not really going to be worth playing the "where's my kernel module"
+ # game long term.  If we ship it we support it, etc.
+ - kernel-modules-extra
+ # Audit
+ - audit
+ # SELinux
+ - selinux-policy-targeted
+ # System setup
+ - passwd
+ # SSH
+ - openssh-server openssh-clients
+ # Containers
+ - podman
+ - containernetworking-plugins
+ - runc
+ - skopeo
+ # Pinned due to cosa on Fedora not honoring RHEL 8 modules as expected
+ - container-selinux
+ - cri-o cri-tools
+ # Networking
+ - nfs-utils
+ - openvswitch2.12
+ - NetworkManager dnsmasq
+ - NetworkManager-ovs
+ - lvm2 iscsi-initiator-utils sg3_utils
+ - device-mapper-multipath
+ - xfsprogs e2fsprogs mdadm
+ - cryptsetup
+ - cifs-utils
+ # Time sync
+ - chrony
+ # Extra runtime
+ - logrotate
+ - sssd shadow-utils
+ # Common tools used by scripts and admins interactively
+ - sudo coreutils less tar xz gzip bzip2 rsync tmux jq
+ - nmap-ncat net-tools bind-utils strace
+ - bash-completion
+ # Editors
+ - vim-minimal nano
+ # Red Hat CA certs
+ - subscription-manager-rhsm-certificates
+ # rdma-core cleanly covers some key bare metal use cases
+ - rdma-core
+ # Used on the bootstrap node
+ - systemd-journal-remote
+ # Extras
+ - systemd-journal-gateway
+ # RHEL7 compatibility
+ - compat-openssl10
+ # LUKS/Encryption support
+ - clevis clevis-luks clevis-dracut cryptsetup-reencrypt tpm2-tools
+ # Used to update PAM configuration to work with SSSD
+ # https://bugzilla.redhat.com/show_bug.cgi?id=1774154
+ - authselect
+ # BELOW HERE ARE PACKAGES NOT IN RHEL
+ # Cluster driven management
+ - machine-config-daemon
+ # OpenShift OKD
+ #- origin-node origin-hyperkube origin-clients
+ # OpenShift
+ - openshift-hyperkube openshift-clients
+
+packages-x86_64:
+  # Temporary add of open-vm-tools. Should be removed when containerized
+  - open-vm-tools
+  # GlusterFS
+  # Temporaly only for x86_64 as were not shipping it for other arches atm
+  # Tracked in https://bugzilla.redhat.com/show_bug.cgi?id=1715175
+  - glusterfs-fuse
+  - irqbalance
+  # Until we sort out 4.2 -> 4.3 upgrades, we need to carry this.
+  # See also https://github.com/ostreedev/ostree/pull/1929
+  - ostree-grub2
+
+packages-ppc64le:
+  - irqbalance
+
+remove-from-packages:
+  - - filesystem
+    - "/usr/share/backgrounds"
+  # https://bugzilla.redhat.com/show_bug.cgi?id=1762509
+  # https://bugzilla.redhat.com/show_bug.cgi?id=1727058
+  - - initscripts
+    - "/"
