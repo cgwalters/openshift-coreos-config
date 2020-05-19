@@ -31,9 +31,11 @@ install() {
     # for a true FIPS boot: https://bugzilla.redhat.com/show_bug.cgi?id=1778940
     echo "# RHCOS FIPS mode installation complete" > "$initdir/etc/system-fips"
 
-    mkdir -p "$initdir/$systemdsystemunitdir/initrd.target.requires"
+    # We don't support FIPS in diskless cases currently
+    target=ignition-diskful
+    mkdir -p "$initdir/$systemdsystemunitdir/${target}.target.requires"
     ln_r "$moddir/rhcos-fips.service" \
-        "$systemdsystemunitdir/initrd.target.requires/rhcos-fips.service"
+        "$systemdsystemunitdir/${target}.target.requires/rhcos-fips.service"
     ln_r "$moddir/rhcos-fips-finish.service" \
-        "$systemdsystemunitdir/initrd.target.requires/rhcos-fips-finish.service"
+        "$systemdsystemunitdir/${target}.target.requires/rhcos-fips-finish.service"
 }

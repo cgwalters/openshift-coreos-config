@@ -48,6 +48,8 @@ if [ "${cryptsetup}" -eq 1 ]; then
     clevis_key | cryptsetup resize "${dm_name}" -
 fi
 
+# See https://github.com/ostreedev/ostree/pull/1767
+test -w /sysroot || mount -o remount,rw /sysroot
 # this part is already idempotent
 xfs_growfs /sysroot
 

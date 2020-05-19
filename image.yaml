@@ -9,5 +9,11 @@ luks_rootfs: "yes"
 # This pairs with the above so we can easily detect in the initrd
 extra-kargs:
   - rhcos.root=crypt_rootfs
+  # https://bugzilla.redhat.com/show_bug.cgi?id=1830280
+  - random.trust_cpu=on
 # https://bugzilla.redhat.com/show_bug.cgi?id=1812276
 squashfs-compression: gzip
+
+# RHCOS doesn't yet support osmet
+# https://github.com/coreos/coreos-installer/issues/224
+osmet: false

@@ -25,7 +25,8 @@ if [ "${root}" != "crypt_rootfs" ]; then
     exit 0
 fi
 
-add_requires coreos-luks-open.service initrd.target
+add_requires coreos-luks-open.service ignition-diskful.target
+add_requires coreos-luks-open.service ignition-diskful-subsequent.target
 
 svc=ignition-ostree-growfs.service
 svcd="${UNIT_DIR}/${svc}.d"

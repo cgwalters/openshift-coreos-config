@@ -24,6 +24,8 @@ Before=sshd.service
 Type=oneshot
 ExecStart=/usr/libexec/rhcos-growpart /
 RemainAfterExit=yes
+# So we can remount /sysroot writable
+MountFlags=slave
 
 [Install]
 WantedBy=multi-user.target

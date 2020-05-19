@@ -14,7 +14,7 @@ install_unit() {
 }
 
 depends() {
-    echo bash crypt clevis fips systemd network-legacy network
+    echo bash crypt clevis fips systemd network
 }
 
 installkernel() {
@@ -39,6 +39,7 @@ install() {
         clevis-encrypt-tang
         clevis-encrypt-tpm2
         clevis-luks-bind
+        clevis-luks-common-functions
         clevis-luks-unbind
         clevis-luks-unlock
         cryptsetup
@@ -84,7 +85,7 @@ install() {
     inst_script /usr/libexec/coreos-cryptlib
 
     # Service for first-boot encryption.
-    install_unit "coreos-encrypt.service" "ignition-complete.target"
+    install_unit "coreos-encrypt.service" "ignition-diskful.target"
     inst_simple "$moddir/coreos-luks-open.service" "$systemdsystemunitdir/coreos-luks-open.service"
     # The generator enables the opening service.
     inst_simple "$moddir/coreos-luks-generator" \

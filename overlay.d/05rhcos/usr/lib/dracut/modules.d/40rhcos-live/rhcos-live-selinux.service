@@ -1,0 +1,15 @@
+
+# This unit is a hack until we have RHEL 8.3
+# https://bugzilla.redhat.com/show_bug.cgi?id=1777525
+[Unit]
+Description=Change SELinux to permissive
+DefaultDependencies=no
+ConditionPathExists=/run/ostree-live
+Requires=initrd-root-fs.target
+Before=ignition-files.service
+After=sysroot-etc.mount
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sed -i -e s,SELINUX=enforcing,SELINUX=permissive, /sysroot/etc/selinux/config
+RemainAfterExit=yes

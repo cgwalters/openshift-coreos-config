@@ -7,15 +7,25 @@ rojig:
 include:
   - fedora-coreos-config/manifests/ignition-and-ostree.yaml
   - fedora-coreos-config/manifests/file-transfer.yaml
+  - fedora-coreos-config/manifests/grub2-removals.yaml
   # RHCOS owned packages
   - rhcos-packages.yaml
-  - centos-stream-repos.yaml
+
+repos:
+  # Base RHEL
+  - rhel8-baseos
+  - rhel8-appstream
+  - rhel8-fast-datapath
+  # ART puddle repos
+  - art-rhcos-4.4
+  - art-rhcos-4.5
+  - art-rhcos-4.6
 
 # We include hours/minutes to avoid version number reuse
-automatic-version-prefix: "45.81.<date:%Y%m%d%H%M>"
+automatic-version-prefix: "46.82.<date:%Y%m%d%H%M>"
 # This ensures we're semver-compatible which OpenShift wants
 automatic-version-suffix: "-"
-mutate-os-release: "4.5"
+mutate-os-release: "4.6"
 
 documentation: false
 initramfs-args:
@@ -35,6 +45,13 @@ initramfs-args:
   - "ifcfg"
   - "--add"
   - "fips"
+  # The current default in RHEL8 is network-legacy
+ ## XXX: This does not work for now: https://github.com/dracutdevs/dracut/issues/798
+ ## XXX: Temporarily use overlay.d/05rhcos/usr/lib/dracut/modules.d/29rhcos-need-network-manager/module-setup.sh
+ #- "--add"
+ #- "network-manager"
+  - "--omit"
+  - "network-legacy"
 
 postprocess:
   - |
@@ -68,6 +85,13 @@ postprocess:
 
      # We're not using resolved yet
      rm -f /usr/lib/systemd/system/systemd-resolved.service
+
+     # Enable tmp-on-tmpfs by default because we don't want to have things
+     # leak across reboots, it increases alignment with FCOS, and also fixes
+     # the Live ISO.  First, verify that RHEL is still disabling.
+     grep -q '# RHEL-only: Disable /tmp on tmpfs' /usr/lib/systemd/system/basic.target
+     echo '# RHCOS-only: we follow the Fedora/upstream default' >> /usr/lib/systemd/system/basic.target
+     echo 'Wants=tmp.mount' >> /usr/lib/systemd/system/basic.target
 
      # Let's have a non-boring motd, just like CL (although theirs is more subdued
      # nowadays compared to early versions with ASCII art).  One thing we do here
@@ -150,6 +174,9 @@ exclude-packages:
   - subscription-manager
   # And this one shouldn't come in
   - dnf
+  # https://github.com/coreos/rpm-ostree/pull/1789/files/a0cd999a8acd5b40ec1024a794a642916fbc8ff8#diff-fc2076dc46933204a7a798f544ce3734
+  # People need to use `rpm-ostree kargs` instead.
+  - grubby
 
 # Try to maintain this list ordering by "in RHEL, then not in RHEL".
 # To verify, disable all repos except the ootpa ones and then comment
@@ -163,6 +190,9 @@ packages:
  # and it's not really going to be worth playing the "where's my kernel module"
  # game long term.  If we ship it we support it, etc.
  - kernel-modules-extra
+ # Originally required for IBM Spectrum Scale. Will be helpful with kmods-via-containers
+ # as well as the RFE for sysdig
+ - kernel-headers kernel-devel
  # Audit
  - audit
  # SELinux
@@ -181,14 +211,17 @@ packages:
  - cri-o cri-tools
  # Networking
  - nfs-utils
- - openvswitch2.12
+ - openvswitch2.13
  - NetworkManager dnsmasq
  - NetworkManager-ovs
+ - NetworkManager-team teamd
  - lvm2 iscsi-initiator-utils sg3_utils
  - device-mapper-multipath
  - xfsprogs e2fsprogs mdadm
  - cryptsetup
  - cifs-utils
+ # Interactive Networking configuration during coreos-install
+ - NetworkManager-tui
  # Time sync
  - chrony
  # Extra runtime
@@ -222,14 +255,13 @@ packages:
  #- origin-node origin-hyperkube origin-clients
  # OpenShift
  - openshift-hyperkube openshift-clients
+ # Gluster - Used for Openshift e2e gluster testcases
+ # Reverts https://gitlab.cee.redhat.com/coreos/redhat-coreos/merge_requests/367 and add it for all arches
+ - glusterfs-fuse
 
 packages-x86_64:
   # Temporary add of open-vm-tools. Should be removed when containerized
   - open-vm-tools
-  # GlusterFS
-  # Temporaly only for x86_64 as were not shipping it for other arches atm
-  # Tracked in https://bugzilla.redhat.com/show_bug.cgi?id=1715175
-  - glusterfs-fuse
   - irqbalance
   # Until we sort out 4.2 -> 4.3 upgrades, we need to carry this.
   # See also https://github.com/ostreedev/ostree/pull/1929
@@ -245,3 +277,15 @@ remove-from-packages:
   # https://bugzilla.redhat.com/show_bug.cgi?id=1727058
   - - initscripts
     - "/"
+  # In newer dracut-network dhclient isn't required if you have NM 1.20
+  # https://github.com/dracutdevs/dracut/commit/e863807
+  # Let's go ahead and get rid of it now.
+  - - dhcp-client
+    # we want to delete all files ("/") but can't because
+    # `remove-from-packages` is being overzealous:
+    # https://github.com/coreos/rpm-ostree/issues/2068
+    - "/etc/dhcp/dhclient.conf"
+    - "/etc/NetworkManager/dispatcher.d/11-dhclient"
+    - "/usr/lib64/pm-utils/sleep.d/56dhclient"
+    - "/usr/sbin/dhclient"
+    - "/usr/sbin/dhclient-script"
