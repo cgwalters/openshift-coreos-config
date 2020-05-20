@@ -1,0 +1,20 @@
+# This file documents currently known-to-fail kola tests. It is consumed by
+# coreos-assembler to automatically blacklist some tests. For more information,
+# see: https://github.com/coreos/coreos-assembler/pull/866.
+- pattern: fips.enable
+  tracker: https://bugzilla.redhat.com/show_bug.cgi?id=1782026
+  arches:
+   - s390x
+- pattern: crio.base
+  tracker: https://github.com/cri-o/cri-o/issues/3618
+  #  This was for the multi-arch problems
+  #  tracker: https://github.com/kubernetes/kubernetes/issues/87325
+  #arches:
+  # - s390x
+  # - ppc64le
+- pattern: rhcos.luks.sss.*
+  tracker: https://github.com/coreos/coreos-assembler/pull/1310
+- pattern: rhcos.luks.tang
+  tracker: https://github.com/coreos/coreos-assembler/pull/1310
+- pattern: coreos.ignition.journald-log
+  tracker: https://github.com/coreos/coreos-assembler/issues/1173

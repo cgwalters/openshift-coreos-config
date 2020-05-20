@@ -11,7 +11,8 @@ dn=$(cd $(dirname $0) && pwd)
 
 src=$1
 shift
-files=(manifest.yaml image.yaml passwd group overlay.d installer live scripts)
+files=(manifest.yaml rhcos-packages.yaml image.yaml passwd group overlay.d installer live scripts
+       kola-blacklist.yaml tests)
 
 for f in ${files[@]}; do
     rsync -rlv --delete "${src}/${f}" ${dn}
