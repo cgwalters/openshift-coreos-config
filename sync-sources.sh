@@ -11,10 +11,10 @@ dn=$(cd $(dirname $0) && pwd)
 
 src=$1
 shift
-files=(manifest.yaml image.yaml passwd group overlay.d installer live)
+files=(manifest.yaml image.yaml passwd group overlay.d installer live scripts)
 
 for f in ${files[@]}; do
-    rsync -rlv "${src}/${f}" ${dn}
+    rsync -rlv --delete "${src}/${f}" ${dn}
 done
 
 fcos_rev=$(cd ${src}/fedora-coreos-config && git rev-parse HEAD)
