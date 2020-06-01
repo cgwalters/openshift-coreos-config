@@ -13,7 +13,9 @@ NET=0
 
 # For the null-cipher case, we skip dm-crypt and use dm-linear. The
 # header offset is used to map the start of the device mapper target.
-LUKS_HEADER_OFFSET=32768
+# This is currently hardcoded; it's unlikely that cryptsetup will change,
+# at least hopefully not before we replace this with Ignition.
+LUKS_HEADER_OFFSET_SECTORS=32768
 
 # we do realpath here since we temporarily lose the label when reencrypting
 dev=$(realpath /dev/disk/by-label/${FS_LABEL})
@@ -129,8 +131,8 @@ try_open() {
         # we can't resize.
         growpart "${parent_device}" "${partition}" || true
 
-        local dev_size=$(($(blockdev --getsize ${dev}) - ${LUKS_HEADER_OFFSET}))
-        echo "0 ${dev_size} linear ${dev} ${LUKS_HEADER_OFFSET}" \
+        local dev_size=$(($(blockdev --getsize ${dev}) - ${LUKS_HEADER_OFFSET_SECTORS}))
+        echo "0 ${dev_size} linear ${dev} ${LUKS_HEADER_OFFSET_SECTORS}" \
             | dmsetup create coreos-luks-root-nocrypt
     else
         local key="$(coreos_key ${dev})"

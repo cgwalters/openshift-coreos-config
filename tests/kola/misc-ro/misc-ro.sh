@@ -34,3 +34,8 @@ case "$(arch)" in
     echo "ok random trust cpu" ;;
   *) echo "Don't know how to test hardware RNG state on arch=$(arch)" ;;
 esac
+
+if [ "$(systemctl is-enabled afterburn-sshkeys@.service)" = enabled ]; then
+  echo "error: afterburn-sshkeys@ is enabled"; exit 1
+fi
+echo "ok afterburn-sshkeys@ is disabled"

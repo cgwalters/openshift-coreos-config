@@ -14,6 +14,9 @@ cd $destdir
 mkdir extensions
 cd extensions
 
+# Stuff that's not part of the extension
+mkdir dependencies
+
 yumdownload() {
     yum --setopt=reposdir=${reposdir} --disablerepo='*' --arch=$(cosa basearch) "$@"
 }
@@ -34,5 +37,10 @@ mkdir kernel-devel
 # For backwards compatibility with ISVs that may be trying to use kernel-devel in
 # its old location.
 for x in kernel-devel/*.rpm; do ln $x ..; done
+
+# usbguard: https://github.com/coreos/fedora-coreos-tracker/issues/326
+(cd dependencies && yumdownload --enablerepo=rhel8-baseos --enablerepo=rhel8-appstream download libqb protobuf)
+mkdir usbguard
+(cd usbguard && yumdownload --enablerepo=rhel8-baseos --enablerepo=rhel8-appstream download usbguard)
 
 createrepo_c --no-database .

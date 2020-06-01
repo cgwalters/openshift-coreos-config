@@ -78,11 +78,6 @@ postprocess:
      EOF
      fi
 
-     # Persistent journal by default; we don't have syslog by default,
-     # and further the systemd default of "persistent only if /var/log/journal"
-     # conflicts with the "/var starts empty" OSTree model.
-     echo 'Storage=persistent' >> /etc/systemd/journald.conf
-
      # Nuke network.service from orbit
      # https://github.com/openshift/os/issues/117
      rm -rf /etc/rc.d/init.d/network /etc/rc.d/rc*.d/*network
@@ -131,16 +126,6 @@ postprocess:
   - |
     #!/usr/bin/bash
     mkdir -p /usr/share/containers/oci/hooks.d
-
-  # Undo RPM scripts enabling units; we want the presets to be canonical
-  # See https://github.com/coreos/fedora-coreos-config/pull/77
-  # and https://github.com/coreos/fedora-coreos-config/commit/b7831399c6b2390cf5162b9486bdefc2a3bd5d9c
-  # If you change this, please change FCOS first.
-  - |
-    #!/usr/bin/env bash
-    set -xeuo pipefail
-    rm -rf /etc/systemd/system/*
-    systemctl preset-all
 
   # This updates the PAM configuration to reference all of the SSSD modules.
   # Removes the `authselect` binary afterwards since `authselect` does not play well with `nss-altfiles`
