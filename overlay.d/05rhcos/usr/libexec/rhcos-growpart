@@ -1,12 +1,12 @@
 #!/bin/bash
 set -euo pipefail
 
-# See also coreos-growpart.service.
-
+# See also rhcos-growpart.service.
+# This service duplicates the FCOS growpart which is
+# done in the initramfs; it will likely go away once
+# we rework to use Ignition LUKS.  See
+# https://github.com/coreos/fedora-coreos-config/pull/503#discussion_r449240871
 # https://github.com/coreos/fedora-coreos-tracker/issues/18
-# See also image.ks.
-# Growpart /, until we can fix Ignition for separate /var
-# (And eventually we want ignition-disks)
 
 path=$1
 shift

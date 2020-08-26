@@ -180,13 +180,24 @@ validate_pin() {
 }
 
 get_clevis_cfg() {
-    # The clevis.json can come either in a kernel CLI of rchos.tpm2
-    # or via an Ignition payload"
+    # Be idempotent if the config was already fetched
     if test -f "${CLEVIS_JSON}"; then
        return
     fi
 
     msg "Fetching clevis config"
+
+    # Make sure the Ignition messages made it to disk before querying
+    # https://bugzilla.redhat.com/show_bug.cgi?id=1862957
+    journalctl --sync
+
+    # See https://github.com/coreos/fedora-coreos-config/commit/65de5e0f1676fa20537caa781937c1632eee5718
+    # And see https://github.com/coreos/ignition/pull/958 for the MESSAGE_ID source.
+    ign_usercfg_msg=$(journalctl -q MESSAGE_ID=57124006b5c94805b77ce473e92a8aeb IGNITION_CONFIG_TYPE=user)
+    if [ -z "${ign_usercfg_msg}" ]; then
+        msg "No Ignition config provided"
+        return
+    fi
 
     local tmp=/run/coreos-cryptfs-tmp
     local tmpsysroot="${tmp}/sysroot"

@@ -19,6 +19,17 @@ firstboot() {
         noop "FIPS mode is enabled."
     fi
 
+    # Make sure the Ignition messages made it to disk before querying
+    # https://bugzilla.redhat.com/show_bug.cgi?id=1862957
+    journalctl --sync
+
+    # See https://github.com/coreos/fedora-coreos-config/commit/65de5e0f1676fa20537caa781937c1632eee5718
+    # And see https://github.com/coreos/ignition/pull/958 for the MESSAGE_ID source.
+    ign_usercfg_msg=$(journalctl -q MESSAGE_ID=57124006b5c94805b77ce473e92a8aeb IGNITION_CONFIG_TYPE=user)
+    if [ -z "${ign_usercfg_msg}" ]; then
+        noop "No Ignition config provided."
+        exit 0
+    fi
     if [ ! -f "${IGNITION_CONFIG}" ]; then
         fatal "Missing ${IGNITION_CONFIG}"
     fi
@@ -80,12 +91,7 @@ finish() {
     # of course, since our approach is "Ignition replaces Anaconda", we have to
     # do it on firstboot ourselves. The key part here is that we do this
     # *before* the initial switch root.
-
-    # We need to teach `fips-mode-setup` about OSTree systems. E.g. it wants to
-    # query and rebuild the initrd. For now, just do the tiny subset of what we
-    # need it to do.
-    sysroot_bwrap update-crypto-policies --set FIPS --no-reload
-    echo '# RHCOS FIPS mode installation complete' > /sysroot/etc/system-fips
+    sysroot_bwrap fips-mode-setup --enable --no-bootcfg
 }
 
 sysroot_bwrap() {

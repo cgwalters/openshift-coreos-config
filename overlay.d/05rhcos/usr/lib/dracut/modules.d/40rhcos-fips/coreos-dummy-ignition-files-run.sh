@@ -42,7 +42,13 @@ cat > "${tmpconfig}" <<EOF
 }
 EOF
 
+# We don't care about SELinux labels for this but Ignition does because we're
+# abusing it for something it's not designed to do. Populate a dummy policy.
+mkdir -p "${tmpsysroot}/etc/selinux/targeted/contexts/files"
+echo 'SELINUXTYPE=targeted' > ${tmpsysroot}/etc/selinux/config
+echo -e '/.*\tsystem_u:object_r:default_t:s0' > "${tmpsysroot}/etc/selinux/targeted/contexts/files/file_contexts"
+
 /usr/bin/ignition \
   --config-cache "${tmpconfig}" \
-  --root="${tmpsysroot}" --oem="${OEM_ID}" --stage=files \
+  --root="${tmpsysroot}" --platform="${PLATFORM_ID}" --stage=files \
   --log-to-stdout &> "${outputdir}/ignition.log"

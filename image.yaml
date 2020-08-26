@@ -17,4 +17,3 @@ squashfs-compression: gzip
 # Kernel arguments to be used on first-boot.
 ignition-network-kcmdline:
     - 'rd.neednet=1'
-    - 'ip=dhcp,dhcp6'

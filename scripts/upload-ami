@@ -11,6 +11,9 @@ import subprocess
 import sys
 
 OPENSHIFT_CI_ACCOUNT = "460538899914"
+OPENSHIFT_DEV_ACCOUNT = "269733383066"
+OPENSHIFT_MARKETPLACE_TEST_ACCOUNT = "125666959065"
+
 # Since we run all tests on QEMU, and as of today don't have really
 # any tests that are specific to a cloud provider, we just run
 # basic sanity checks.
@@ -37,11 +40,22 @@ def upload_to_cloud(buildid, region, bucket, suffix=None, public=False):
     if suffix is not None:
         ca_args.append(f'--name-suffix={suffix}')
 
-    # If the AMI isn't public, then just grant access to the CI account.
-    if not public and cloud == AWS:
-        ca_args.extend(["--grant-user", OPENSHIFT_CI_ACCOUNT])
-
+    # If the AMI is public, grant image launch and ec2 snapshot permissions to Marketplace account.
+    if public and cloud == AWS:
+        ca_args.extend(["--grant-user", OPENSHIFT_MARKETPLACE_TEST_ACCOUNT])
+        ca_args.extend(["--grant-user-snapshot", OPENSHIFT_MARKETPLACE_TEST_ACCOUNT])
     try:
+        print(ca_args)
+        subprocess.check_call(ca_args)
+    except subprocess.CalledProcessError as upload_err:
+        print("Failed to build/upload image! Error: {}".format(upload_err))
+        raise
+
+    # If the AMI isn't public, then just grant access to the dev and CI accounts.
+    if not public and cloud == AWS:
+        ca_args.extend(["--grant-user", OPENSHIFT_CI_ACCOUNT, OPENSHIFT_DEV_ACCOUNT])
+    try:
+        print(ca_args)
         subprocess.check_call(ca_args)
     except subprocess.CalledProcessError as upload_err:
         print("Failed to build/upload image! Error: {}".format(upload_err))

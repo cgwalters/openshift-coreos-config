@@ -3,7 +3,13 @@ Description=Check for FIPS mode
 DefaultDependencies=false
 ConditionKernelCommandLine=ignition.firstboot
 
+# Any services looking at mounts should generally order after the
+# GPT regenerator.
+# This is technically already guaranteed by After=ignition-fetch.service
+# but just as a sanity-check let's add it here too.
+After=coreos-gpt-setup@dev-disk-by\x2dlabel-root.service
 # we need to be able to mount /boot
+After=dev-disk-by\x2dlabel-boot.device
 Requires=dev-disk-by\x2dlabel-boot.device
 
 # we need the fetched Ignition config, but before disks start

@@ -20,10 +20,10 @@ repos:
   - rhel8-baseos
   - rhel8-appstream
   - rhel8-fast-datapath
-  # ART puddle repos
-  - art-rhcos-4.4
-  - art-rhcos-4.5
-  - art-rhcos-4.6
+  # ART RHAOS repos
+  - art-rhaos-4.4
+  - art-rhaos-4.5
+  - art-rhaos-4.6
 
 # We include hours/minutes to avoid version number reuse
 automatic-version-prefix: "46.82.<date:%Y%m%d%H%M>"
@@ -127,6 +127,13 @@ postprocess:
     #!/usr/bin/bash
     mkdir -p /usr/share/containers/oci/hooks.d
 
+  # This is part of e.g. fedora-repos in Fedora; we now want to include it by default
+  # so that the MCO can use it by default and not trip over SELinux issues trying
+  # to create it.
+  - |
+    #!/usr/bin/bash
+    mkdir -p /etc/yum.repos.d
+
   # This updates the PAM configuration to reference all of the SSSD modules.
   # Removes the `authselect` binary afterwards since `authselect` does not play well with `nss-altfiles`
   # (https://github.com/pbrezina/authselect/issues/48).
@@ -141,6 +148,17 @@ postprocess:
       authselect test sssd --${pam_file} | tail -n +2 > /etc/pam.d/${pam_file}
     done
     rm -f $(which authselect)
+
+  # Stop shipping a baked initiator name in the image; this should be generated
+  # at runtime. We have a service which does this
+  # (coreos-generate-iscsi-initiatorname.service) until it's done properly
+  # upstream (see https://bugzilla.redhat.com/show_bug.cgi?id=1493296).
+  - |
+     #!/usr/bin/env bash
+     set -xeuo pipefail
+
+     # NB: we don't use -f here so we break when this is no longer needed
+     rm -v /etc/iscsi/initiatorname.iscsi
 
 etc-group-members:
   - wheel
@@ -237,9 +255,9 @@ packages:
  # Used to update PAM configuration to work with SSSD
  # https://bugzilla.redhat.com/show_bug.cgi?id=1774154
  - authselect
+ # Dracut module dependencies
+ - bsdtar
  # BELOW HERE ARE PACKAGES NOT IN RHEL
- # Cluster driven management
- - machine-config-daemon
  # OpenShift OKD
  #- origin-node origin-hyperkube origin-clients
  # OpenShift
